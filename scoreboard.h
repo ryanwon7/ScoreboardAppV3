@@ -2,6 +2,13 @@
 #define SCOREBOARD_HEADER
 
 #include <stdbool.h>
+#include <windows.h>
+
+typedef struct timer_t {
+	int minutes;
+	int seconds;
+	int decaseconds;
+} timer_t;
 
 typedef struct CommandKeycodes {
 	int leftMinusPtKey;
@@ -23,6 +30,21 @@ typedef struct CommandKeycodes {
 	int configureKey;
 } CommandKeycodes;
 
+typedef struct DefaultData {
+	timer_t timer_default;
+	timer_t timeout_default;
+	timer_t ot_default;
+	char defaultHomeName[28];
+	char defaultAwayName[28];
+	int max_timeouts;
+	int max_periods;
+} DefaultData;
+
+typedef struct ScoreboardDefaults {
+	CommandKeycodes keycodes;
+	DefaultData data;
+} ScoreboardDefaults;
+
 typedef struct PaintRegions {
 	bool homeTeam;
 	bool awayTeam;
@@ -40,12 +62,6 @@ typedef struct PaintRegions {
 	bool all;
 } PaintRegions;
 
-typedef struct timer_t {
-	int minutes;
-	int seconds;
-	int decaseconds;
-} timer_t;
-
 typedef struct ScoreboardState {
 	int switchState; // 0 default, home left away right. 1=switched, home right away left
 	int homeScore;
@@ -57,14 +73,12 @@ typedef struct ScoreboardState {
 	int period;
 	int timeoutCaller; // 0 for left, 1 for right
 	bool toggle;
-	timer_t timer_default;
 	timer_t timer_current;
-	timer_t timeout_default;
 	timer_t timeout_current;
 } ScoreboardState;
 
 typedef struct ScoreboardControl {
-	CommandKeycodes keycodes;
+	ScoreboardDefaults defaults;
 	PaintRegions paint;
 	ScoreboardState state;
 } ScoreboardControl;

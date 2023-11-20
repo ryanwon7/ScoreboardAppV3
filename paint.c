@@ -1,5 +1,4 @@
-﻿#include <windows.h>
-#include <math.h>
+﻿#include <math.h>
 #include "scoreboard.h"
 #include "paint.h"
 
@@ -392,7 +391,7 @@ void paintRightLogo(ScoreboardDesign* scoreboard_design, HDC hdc, HWND hwnd)
 	// Select the brush and pen into the device context
 	SelectObject(hdc, scoreboard_design->backgroundBrush);
 
-	RECT clientRect, bgRect, textRect;
+	RECT clientRect, bgRect;
 	GetClientRect(hwnd, &clientRect);
 	
 	bgRect.left = floor(0.751 * (clientRect.right - clientRect.left));
@@ -440,7 +439,7 @@ void paintRightLogo(ScoreboardDesign* scoreboard_design, HDC hdc, HWND hwnd)
 
 void paintLogoBackground(ScoreboardDesign* scoreboard_design, HDC hdc, HWND hwnd)
 {
-	RECT clientRect,roundRect;
+	RECT clientRect;
 	GetClientRect(hwnd, &clientRect);
 	SelectObject(hdc, scoreboard_design->backgroundBrush);
 

@@ -1,33 +1,30 @@
 ﻿#include <windows.h>
 #include <mmsystem.h>
 #include <stdio.h>
+#include <stdint.h>
+
 #include "scoreboard.h"
 #include "paint.h"
 #include "resource.h"
+#include "config.h"
+#include "dialog.h"
 
 #pragma comment(lib, "winmm.lib")
 
-/* Globals */
+/* Global States */
 bool g_clock_running;
 bool g_timeout_running;
-int max_timeouts = 2;
-int max_periods = 2;
-HWND g_hDlg;
+HANDLE g_hTimer, g_hTimeout;
 
 /* Static function declaration */
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-static INT_PTR CALLBACK SettingsDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
-static void loadConfigFileAndDefaults( ScoreboardControl* scoreboard_control, ScoreboardDesign* scoreboard_design);
 static void deleteDesigns( ScoreboardDesign * design );
-static void configurationDialog( HWND hwndParent );
 static void soundBuzzer( void );
-static void onClockTimer(HWND hwnd);
-static void onTimeoutTimer(HWND hwnd);
-static void onTimeoutTimer(HWND hwnd);
+static VOID CALLBACK TimerCallback(PVOID lpParameter, BOOLEAN TimerOrWaitFired);
+static VOID CALLBACK TimeoutCallback(PVOID lpParameter, BOOLEAN TimerOrWaitFired);
 static void paintScoreboard(HWND hwnd);
 static void userCharCommand(HWND hwnd, WPARAM wParam);
 static void onResize(HWND hwnd);
-static void reset( ScoreboardControl * scoreboard_control );
 
 /* Functions */
 int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine, int nCmdShow)
@@ -81,6 +78,8 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         DispatchMessage(&msg);
     }
 
+	//writeToConfig(scoreboard_control);
+
 	free(scoreboard_control);
 	deleteDesigns(scoreboard_design);
 
@@ -90,14 +89,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam) 
 {
     switch(msg)
-    {
-		case WM_TIMER:
-			if (g_clock_running)
-				onClockTimer(hwnd);
-			else
-				onTimeoutTimer(hwnd);
-			break;
-			
+    {	
 		case WM_PAINT:
 			paintScoreboard(hwnd);
 			break;
@@ -124,129 +116,6 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
     }
 
     return DefWindowProcW(hwnd, msg, wParam, lParam);
-}
-
-static INT_PTR CALLBACK SettingsDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
-{
-    switch (msg)
-    {
-    case WM_COMMAND:
-        if (LOWORD(wParam) == IDOK)
-        {
-            // Handle OK button click
-            // Retrieve and process settings here
-            EndDialog(hwnd, IDOK);
-            return TRUE;
-        }
-        else if (LOWORD(wParam) == IDCANCEL)
-        {
-            // Handle Cancel button click
-            EndDialog(hwnd, IDCANCEL);
-            return TRUE;
-        }
-        break;
-
-    case WM_CLOSE:
-        // Handle close button click
-        EndDialog(hwnd, IDCANCEL);
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
-static void loadConfigFileAndDefaults( ScoreboardControl* scoreboard_control, ScoreboardDesign* scoreboard_design)
-{
-	// for now im just going to populate with hardcoded defaults, shift to config file later
-	scoreboard_control->keycodes.leftMinusPtKey = 97;
-	scoreboard_control->keycodes.leftPlus2PtKey = 100;
-	scoreboard_control->keycodes.leftPlus3PtKey = 103;
-	scoreboard_control->keycodes.leftTimeoutKey = 27;
-	scoreboard_control->keycodes.rightMinusPtKey = 99;
-	scoreboard_control->keycodes.rightPlus2PtKey = 102;
-	scoreboard_control->keycodes.rightPlus3PtKey = 105;
-	scoreboard_control->keycodes.rightTimeoutKey = 106;
-	scoreboard_control->keycodes.switchKey = 96;
-	scoreboard_control->keycodes.resetKey = 46;
-	scoreboard_control->keycodes.setKey = 98;
-	scoreboard_control->keycodes.periodPlusKey = 104;
-	scoreboard_control->keycodes.periodMinusKey = 101;
-	scoreboard_control->keycodes.startTimeKey = 109;
-	scoreboard_control->keycodes.stopTimeKey = 107;
-	scoreboard_control->keycodes.timeoutClearKey = 111;
-	scoreboard_control->keycodes.configureKey = 110; //todo
-
-	scoreboard_control->paint.homeTeam = false;
-	scoreboard_control->paint.awayTeam = false;
-	scoreboard_control->paint.homeScore = false;
-	scoreboard_control->paint.awayScore = false;
-	scoreboard_control->paint.homeTimeouts = false;
-	scoreboard_control->paint.awayTimeouts = false;
-	scoreboard_control->paint.period = false;
-	scoreboard_control->paint.timer = false;
-	scoreboard_control->paint.timerTimeout = false;
-	scoreboard_control->paint.timeoutFlicker = false;
-	scoreboard_control->paint.leftLogo = false;
-	scoreboard_control->paint.rightLogo = false;
-	scoreboard_control->paint.switches = false;
-	scoreboard_control->paint.all = true;
-
-	scoreboard_control->state.switchState = 0;
-	scoreboard_control->state.homeScore = 0;
-	scoreboard_control->state.awayScore = 0;
-	scoreboard_control->state.homeTimeouts = max_timeouts;
-	scoreboard_control->state.awayTimeouts = max_timeouts;
-	strcpy(scoreboard_control->state.homeName, "Honey Buns");
-	strcpy(scoreboard_control->state.awayName, "Fish Taxi");
-	scoreboard_control->state.period = 1;
-	scoreboard_control->state.timeoutCaller = 0;
-	scoreboard_control->state.toggle = false;
-	scoreboard_control->state.timer_default.minutes = 12;
-	scoreboard_control->state.timer_default.seconds = 30;
-	scoreboard_control->state.timer_default.decaseconds = 0;
-	scoreboard_control->state.timer_current.minutes = 12;
-	scoreboard_control->state.timer_current.seconds = 30;
-	scoreboard_control->state.timer_current.decaseconds = 0;
-	scoreboard_control->state.timeout_default.minutes = 0;
-	scoreboard_control->state.timeout_default.seconds = 30;
-	scoreboard_control->state.timeout_default.decaseconds = 0;
-	scoreboard_control->state.timeout_current.minutes = 0;
-	scoreboard_control->state.timeout_current.seconds = 30;
-	scoreboard_control->state.timeout_current.decaseconds = 0;
-
-	scoreboard_design->timerFont = CreateFont(0.3 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
-        DEFAULT_PITCH | FF_SWISS, "Arial Nova");
-
-	scoreboard_design->teamFont = CreateFont(0.11 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
-        DEFAULT_PITCH | FF_SWISS, "Arial Nova");
-
-	scoreboard_design->scoreFont = CreateFont(0.43 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
-        DEFAULT_PITCH | FF_SWISS, "Arial Nova");
-
-	scoreboard_design->periodFont = CreateFont(0.19 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
-        DEFAULT_PITCH | FF_SWISS, "Arial Nova");
-
-	scoreboard_design->overtimeFont = CreateFont(0.14 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
-        DEFAULT_PITCH | FF_SWISS, "Arial Nova");
-
-	scoreboard_design->smallFont = CreateFont(0.035 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, TRUE, FALSE, FALSE,                      
-        DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
-        DEFAULT_PITCH | FF_SWISS, "Arial Nova");
-
-	scoreboard_design->outlinePen = CreatePen(PS_SOLID, 2, RGB(255, 255, 255));
-	scoreboard_design->backgroundBrush = CreateSolidBrush(RGB(60, 75, 40));
-	scoreboard_design->fillBrush = CreateSolidBrush(RGB(39, 39, 39));
-	scoreboard_design->fillHomeBrush = CreateSolidBrush(RGB(204, 0, 0));
-	scoreboard_design->fillAwayBrush = CreateSolidBrush(RGB(255, 192, 0));
-
-	scoreboard_design->logo = (HBITMAP)LoadImageW(NULL, L"resources/logo.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
-	scoreboard_design->logoLeft = (HBITMAP)LoadImageW(NULL, L"resources/JBA2.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
-	scoreboard_design->logoRight = (HBITMAP)LoadImageW(NULL, L"resources/JBA.bmp", IMAGE_BITMAP, 0, 0, LR_LOADFROMFILE);
 }
 
 static void deleteDesigns( ScoreboardDesign * design )
@@ -302,18 +171,15 @@ static void deleteDesigns( ScoreboardDesign * design )
 	free(design);
 }
 
-static void configurationDialog(HWND hwndParent)
+static VOID CALLBACK TimerCallback(PVOID lpParameter, BOOLEAN TimerOrWaitFired)
 {
-    // Create the settings dialog
-    g_hDlg = CreateDialog(GetModuleHandle(NULL), MAKEINTRESOURCE(IDD_SETTINGS), hwndParent, SettingsDlgProc);
+	if (lpParameter == NULL) {
+        // Handle error
+        return;
+    }
+    HWND hwnd = (HWND)(intptr_t)lpParameter;
 
-    // Show the settings dialog
-    ShowWindow(g_hDlg, SW_SHOW);
-}
-
-static void onClockTimer(HWND hwnd)
-{
-	ScoreboardControl* scoreboard_control = (ScoreboardControl*)GetWindowLongPtr(hwnd, 0);
+    ScoreboardControl* scoreboard_control = (ScoreboardControl*)GetWindowLongPtr(hwnd, 0);
 	if (scoreboard_control->state.timer_current.decaseconds == 0)
 	{
 		if (scoreboard_control->state.timer_current.seconds == 0)
@@ -321,7 +187,7 @@ static void onClockTimer(HWND hwnd)
 			if (scoreboard_control->state.timer_current.minutes == 0)
 			{
     			sndPlaySound("resources/beep_long.wav", SND_FILENAME | SND_ASYNC);
-				KillTimer(hwnd, 1);
+				DeleteTimerQueueTimer(NULL, g_hTimer, NULL);
 				g_clock_running = false;
 			}
 			else
@@ -350,9 +216,15 @@ static void onClockTimer(HWND hwnd)
 	}
 }
 
-static void onTimeoutTimer(HWND hwnd)
+static VOID CALLBACK TimeoutCallback(PVOID lpParameter, BOOLEAN TimerOrWaitFired)
 {
-	ScoreboardControl* scoreboard_control = (ScoreboardControl*)GetWindowLongPtr(hwnd, 0);
+	if (lpParameter == NULL) {
+        // Handle error
+        return;
+    }
+    HWND hwnd = (HWND)(intptr_t)lpParameter;
+
+    ScoreboardControl* scoreboard_control = (ScoreboardControl*)GetWindowLongPtr(hwnd, 0);
 	if (scoreboard_control->state.timeout_current.decaseconds == 0)
 	{
 		if (scoreboard_control->state.timeout_current.seconds == 0)
@@ -360,7 +232,7 @@ static void onTimeoutTimer(HWND hwnd)
 			if (scoreboard_control->state.timeout_current.minutes == 0)
 			{
     			sndPlaySound("resources/beep.wav", SND_FILENAME | SND_ASYNC);
-				KillTimer(hwnd, 2);
+				DeleteTimerQueueTimer(NULL, g_hTimeout, NULL);
 				g_timeout_running = false;
 				scoreboard_control->paint.timeoutFlicker = true;
 				scoreboard_control->state.toggle = true;
@@ -539,15 +411,19 @@ static void paintScoreboard(HWND hwnd)
 	else if (scoreboard_control->paint.period)
 	{
 		bool overtime;
-		if (scoreboard_control->state.period > max_periods)
+		if (scoreboard_control->state.period > scoreboard_control->defaults.data.max_periods)
 		{
 			overtime = true;
 			paintPeriod(scoreboard_design, hdc, hwnd, overtime, scoreboard_control->state.period);
+			paintTimer(scoreboard_design, hdc, hwnd, scoreboard_control->state.timer_current.minutes, 
+				scoreboard_control->state.timer_current.seconds, scoreboard_control->state.timer_current.decaseconds);
 		}
 		else
 		{
 			overtime = false;
 			paintPeriod(scoreboard_design, hdc, hwnd, overtime, scoreboard_control->state.period);
+			paintTimer(scoreboard_design, hdc, hwnd, scoreboard_control->state.timer_current.minutes, 
+				scoreboard_control->state.timer_current.seconds, scoreboard_control->state.timer_current.decaseconds);
 		}
 		scoreboard_control->paint.period = false;
 	}
@@ -625,7 +501,7 @@ static void paintScoreboard(HWND hwnd)
 			paintRightTimeouts(scoreboard_design, hdc, hwnd, true, scoreboard_control->state.homeTimeouts);
 		}
 		bool overtime;
-		if (scoreboard_control->state.period > max_periods)
+		if (scoreboard_control->state.period > scoreboard_control->defaults.data.max_periods)
 		{
 			overtime = true;
 			paintPeriod(scoreboard_design, hdc, hwnd, overtime, scoreboard_control->state.period);
@@ -645,7 +521,7 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
     ScoreboardControl* scoreboard_control = (ScoreboardControl*)GetWindowLongPtr(hwnd, 0);
 
 	// checks for if/else ordered by expected frequency to reduce checks
-	if (wParam == scoreboard_control->keycodes.rightPlus2PtKey)
+	if (wParam == scoreboard_control->defaults.keycodes.rightPlus2PtKey)
 	{
 		if (scoreboard_control->state.switchState == 0) // home left, away right
 		{
@@ -659,7 +535,7 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 		}
     	InvalidateRect(hwnd, NULL, TRUE);
 	}
-	else if (wParam == scoreboard_control->keycodes.leftPlus2PtKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.leftPlus2PtKey)
 	{
 		if (scoreboard_control->state.switchState == 0) // home left, away right
 		{
@@ -673,7 +549,7 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 		}
     	InvalidateRect(hwnd, NULL, TRUE);
 	}
-	else if (wParam == scoreboard_control->keycodes.rightPlus3PtKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.rightPlus3PtKey)
 	{
 		if (scoreboard_control->state.switchState == 0) // home left, away right
 		{
@@ -687,7 +563,7 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 		}
     	InvalidateRect(hwnd, NULL, TRUE);
 	}
-	else if (wParam == scoreboard_control->keycodes.leftPlus3PtKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.leftPlus3PtKey)
 	{
 		if (scoreboard_control->state.switchState == 0) // home left, away right
 		{
@@ -701,13 +577,16 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 		}
     	InvalidateRect(hwnd, NULL, TRUE);
 	}
-	else if (wParam == scoreboard_control->keycodes.startTimeKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.startTimeKey)
 	{
 		if (!g_timeout_running)
 		{
 			if(!g_clock_running)
 			{
-				SetTimer(hwnd, 1, 100, NULL);
+				if (!CreateTimerQueueTimer(&g_hTimer, NULL, TimerCallback, (PVOID)(intptr_t)hwnd, 100, 100, 0)) {
+					// Handle error
+					return;
+				}
 				g_clock_running = true;
 
 				if (scoreboard_control->state.timeoutCaller == 0)
@@ -718,18 +597,18 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 			}
 		}
 	}
-	else if (wParam == scoreboard_control->keycodes.stopTimeKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.stopTimeKey)
 	{
 		if (!g_timeout_running)
 		{
 			if(g_clock_running)
 			{
-				KillTimer(hwnd, 1);
+				DeleteTimerQueueTimer(NULL, g_hTimer, NULL);
 				g_clock_running = false;
 			}
 		}
 	}
-	else if (wParam == scoreboard_control->keycodes.rightMinusPtKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.rightMinusPtKey)
 	{
 		if (scoreboard_control->state.switchState == 0) // home left, away right
 		{
@@ -743,7 +622,7 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 		}
     	InvalidateRect(hwnd, NULL, TRUE);
 	}
-	else if (wParam == scoreboard_control->keycodes.leftMinusPtKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.leftMinusPtKey)
 	{
 		if (scoreboard_control->state.switchState == 0) // home left, away right
 		{
@@ -757,25 +636,38 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 		}
     	InvalidateRect(hwnd, NULL, TRUE);
 	}
-	else if (wParam == scoreboard_control->keycodes.periodPlusKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.periodPlusKey)
 	{
-		if (scoreboard_control->state.period <= max_periods)
+		if(!g_clock_running && !g_timeout_running)
 		{
-			scoreboard_control->state.period++;
-			scoreboard_control->paint.period = true;
-    		InvalidateRect(hwnd, NULL, TRUE);
+			if (scoreboard_control->state.period <= scoreboard_control->defaults.data.max_periods)
+			{
+				scoreboard_control->state.period++;
+				scoreboard_control->paint.period = true;
+				
+				if (scoreboard_control->state.period > scoreboard_control->defaults.data.max_periods)
+					scoreboard_control->state.timer_current = scoreboard_control->defaults.data.ot_default;
+				else
+					scoreboard_control->state.timer_current = scoreboard_control->defaults.data.timer_default;
+
+				InvalidateRect(hwnd, NULL, TRUE);
+			}
 		}
 	}
-	else if (wParam == scoreboard_control->keycodes.periodMinusKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.periodMinusKey)
 	{
-		if (scoreboard_control->state.period > 1)
+		if(!g_clock_running && !g_timeout_running)
 		{
-			scoreboard_control->state.period--;
-			scoreboard_control->paint.period = true;
-    		InvalidateRect(hwnd, NULL, TRUE);
+			if (scoreboard_control->state.period > 1)
+			{
+				scoreboard_control->state.period--;
+				scoreboard_control->state.timer_current = scoreboard_control->defaults.data.timer_default;
+				scoreboard_control->paint.period = true;
+				InvalidateRect(hwnd, NULL, TRUE);
+			}
 		}
 	}
-	else if (wParam == scoreboard_control->keycodes.rightTimeoutKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.rightTimeoutKey)
 	{
 		if (!g_timeout_running)
 		{
@@ -787,16 +679,19 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 					scoreboard_control->paint.awayTimeouts = true;
 
 					scoreboard_control->state.timeoutCaller = 1;
-					scoreboard_control->state.timeout_current = scoreboard_control->state.timeout_default;
+					scoreboard_control->state.timeout_current = scoreboard_control->defaults.data.timeout_default;
 
 					if(g_clock_running)
 					{
-						KillTimer(hwnd, 1);
+						DeleteTimerQueueTimer(NULL, g_hTimer, NULL);
 						g_clock_running = false;
 					}
 					InvalidateRect(hwnd, NULL, TRUE);
 					g_timeout_running = true;
-					SetTimer(hwnd, 2, 100, NULL);
+					if (!CreateTimerQueueTimer(&g_hTimeout, NULL, TimeoutCallback, (PVOID)(intptr_t)hwnd, 100, 100, 0)) {
+						// Handle error
+						return;
+					}
 				}
 			}
 			else // home right, away left
@@ -807,21 +702,24 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 					scoreboard_control->paint.homeTimeouts = true;
 
 					scoreboard_control->state.timeoutCaller = 1;
-					scoreboard_control->state.timeout_current = scoreboard_control->state.timeout_default;
+					scoreboard_control->state.timeout_current = scoreboard_control->defaults.data.timeout_default;
 
 					if(g_clock_running)
 					{
-						KillTimer(hwnd, 1);
+						DeleteTimerQueueTimer(NULL, g_hTimer, NULL);
 						g_clock_running = false;
 					}
 					InvalidateRect(hwnd, NULL, TRUE);
 					g_timeout_running = true;
-					SetTimer(hwnd, 2, 100, NULL);
+					if (!CreateTimerQueueTimer(&g_hTimeout, NULL, TimeoutCallback, (PVOID)(intptr_t)hwnd, 100, 100, 0)) {
+						// Handle error
+						return;
+					}
 				}
 			}
 		}
 	}
-	else if (wParam == scoreboard_control->keycodes.leftTimeoutKey)
+	else if (wParam == scoreboard_control->defaults.keycodes.leftTimeoutKey)
 	{
 		if (!g_timeout_running)
 		{
@@ -833,16 +731,19 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 					scoreboard_control->paint.homeTimeouts = true;
 
 					scoreboard_control->state.timeoutCaller = 0;
-					scoreboard_control->state.timeout_current = scoreboard_control->state.timeout_default;
+					scoreboard_control->state.timeout_current = scoreboard_control->defaults.data.timeout_default;
 
 					if(g_clock_running)
 					{
-						KillTimer(hwnd, 1);
+						DeleteTimerQueueTimer(NULL, g_hTimer, NULL);
 						g_clock_running = false;
 					}
 					InvalidateRect(hwnd, NULL, TRUE);
 					g_timeout_running = true;
-					SetTimer(hwnd, 2, 100, NULL);
+					if (!CreateTimerQueueTimer(&g_hTimeout, NULL, TimeoutCallback, (PVOID)(intptr_t)hwnd, 100, 100, 0)) {
+						// Handle error
+						return;
+					}
 				}
 			}
 			else // home right, away left
@@ -853,27 +754,30 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 					scoreboard_control->paint.awayTimeouts = true;
 
 					scoreboard_control->state.timeoutCaller = 0;
-					scoreboard_control->state.timeout_current = scoreboard_control->state.timeout_default;
+					scoreboard_control->state.timeout_current = scoreboard_control->defaults.data.timeout_default;
 
 					if(g_clock_running)
 					{
-						KillTimer(hwnd, 1);
+						DeleteTimerQueueTimer(NULL, g_hTimer, NULL);
 						g_clock_running = false;
 					}
 					InvalidateRect(hwnd, NULL, TRUE);
 					g_timeout_running = true;
-					SetTimer(hwnd, 2, 100, NULL);
+					if (!CreateTimerQueueTimer(&g_hTimeout, NULL, TimeoutCallback, (PVOID)(intptr_t)hwnd, 100, 100, 0)) {
+						// Handle error
+						return;
+					}
 				}
 			}
 		}
 	}
-	else if(wParam == scoreboard_control->keycodes.timeoutClearKey)
+	else if(wParam == scoreboard_control->defaults.keycodes.timeoutClearKey)
 	{
 		if (g_timeout_running)
 		{
 			
     		sndPlaySound("resources/beep.wav", SND_FILENAME | SND_ASYNC);
-			KillTimer(hwnd, 2);
+			DeleteTimerQueueTimer(NULL, g_hTimeout, NULL);
 			g_timeout_running = false;
 			scoreboard_control->state.toggle = false;
 
@@ -892,7 +796,7 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
     		InvalidateRect(hwnd, NULL, TRUE);
 		}
 	}
-	else if(wParam == scoreboard_control->keycodes.switchKey)
+	else if(wParam == scoreboard_control->defaults.keycodes.switchKey)
 	{
 		if(!g_clock_running && !g_timeout_running)
 		{
@@ -910,16 +814,16 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 			}
 		}
 	}
-	else if(wParam == scoreboard_control->keycodes.setKey)
+	else if(wParam == scoreboard_control->defaults.keycodes.setKey)
 	{
 		if(!g_clock_running)
 		{
-			scoreboard_control->state.timer_current = scoreboard_control->state.timer_default;
+			scoreboard_control->state.timer_current = scoreboard_control->defaults.data.timer_default;
 			scoreboard_control->paint.timer = true;
     		InvalidateRect(hwnd, NULL, TRUE);
 		}
 	}
-	else if(wParam == scoreboard_control->keycodes.resetKey)
+	else if(wParam == scoreboard_control->defaults.keycodes.resetKey)
 	{
 		if(g_clock_running)
 		{
@@ -932,14 +836,15 @@ static void userCharCommand(HWND hwnd, WPARAM wParam)
 			KillTimer(hwnd, 2);
 			g_timeout_running = false;
 		}
-		reset(scoreboard_control);
+		setDefaults(scoreboard_control);
     	InvalidateRect(hwnd, NULL, TRUE);
 	}
-	else if(wParam == scoreboard_control->keycodes.configureKey)
+	else if(wParam == scoreboard_control->defaults.keycodes.configureKey)
 	{
 		if(!g_clock_running && !g_timeout_running)
 		{
 			configurationDialog(hwnd);
+    		InvalidateRect(hwnd, NULL, TRUE);	
 		}
 	}
 }
@@ -952,45 +857,4 @@ static void onResize(HWND hwnd)
 		scoreboard_control->paint.all = true;
     	InvalidateRect(hwnd, NULL, TRUE);
 	}
-}
-
-static void reset( ScoreboardControl * scoreboard_control )
-{
-	scoreboard_control->paint.homeTeam = false;
-	scoreboard_control->paint.awayTeam = false;
-	scoreboard_control->paint.homeScore = false;
-	scoreboard_control->paint.awayScore = false;
-	scoreboard_control->paint.homeTimeouts = false;
-	scoreboard_control->paint.awayTimeouts = false;
-	scoreboard_control->paint.period = false;
-	scoreboard_control->paint.timer = false;
-	scoreboard_control->paint.timerTimeout = false;
-	scoreboard_control->paint.timeoutFlicker = false;
-	scoreboard_control->paint.leftLogo = false;
-	scoreboard_control->paint.rightLogo = false;
-	scoreboard_control->paint.switches = false;
-	scoreboard_control->paint.all = true;
-
-	scoreboard_control->state.switchState = 0;
-	scoreboard_control->state.homeScore = 0;
-	scoreboard_control->state.awayScore = 0;
-	scoreboard_control->state.homeTimeouts = max_timeouts;
-	scoreboard_control->state.awayTimeouts = max_timeouts;
-	strcpy(scoreboard_control->state.homeName, "Honey Buns");
-	strcpy(scoreboard_control->state.awayName, "Fish Taxi");
-	scoreboard_control->state.period = 1;
-	scoreboard_control->state.timeoutCaller = 0;
-	scoreboard_control->state.toggle = false;
-	scoreboard_control->state.timer_default.minutes = 12;
-	scoreboard_control->state.timer_default.seconds = 30;
-	scoreboard_control->state.timer_default.decaseconds = 0;
-	scoreboard_control->state.timer_current.minutes = 0;
-	scoreboard_control->state.timer_current.seconds = 6;
-	scoreboard_control->state.timer_current.decaseconds = 0;
-	scoreboard_control->state.timeout_default.minutes = 0;
-	scoreboard_control->state.timeout_default.seconds = 30;
-	scoreboard_control->state.timeout_default.decaseconds = 0;
-	scoreboard_control->state.timeout_current.minutes = 0;
-	scoreboard_control->state.timeout_current.seconds = 30;
-	scoreboard_control->state.timeout_current.decaseconds = 0;
 }

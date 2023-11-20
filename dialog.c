@@ -4,9 +4,10 @@
 #include "dialog.h"
 
 DialogData * user_data;
+bool bContentChanged = false;
 
 static void initUserData(HWND hwnd);
-static void readUserData(HWND hwnd);
+static void updateUserData(HWND hwnd, int controlId);
 static void saveUserDataAndPaint(HWND hwnd);
 static void setTabOne(HWND hwnd);
 static void setTabTwo(HWND hwnd);
@@ -136,7 +137,61 @@ static void setTabTwo(HWND hwnd)
 static INT_PTR CALLBACK SettingsDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
     switch (msg)
-    {        
+    {
+        case WM_COMMAND:
+        {
+            int control = LOWORD(wParam);
+            int notificationCode = HIWORD(wParam);
+
+            if (notificationCode == EN_CHANGE)
+            {
+                bContentChanged = true;
+            }
+            else if (notificationCode == EN_KILLFOCUS)
+            {
+                if (bContentChanged)
+                {
+                    updateUserData(hwnd, control);
+                    bContentChanged = false;
+                }
+            }
+            else if (control == IDOK)
+            {
+                saveUserDataAndPaint(hwnd);
+                free(user_data);
+                EndDialog(hwnd, IDOK);
+                return TRUE;
+            }
+            else if (control == IDCANCEL)
+            {
+                free(user_data);
+                EndDialog(hwnd, IDCANCEL);
+                return TRUE;
+            }
+            break;
+        }
+   
+        case WM_NOTIFY:
+        {
+            NMHDR* pnmhdr = (NMHDR*)lParam;
+            if (pnmhdr->code == TCN_SELCHANGE) {
+                // Tab selection changed
+                int tabIndex = TabCtrl_GetCurSel(GetDlgItem(hwnd, IDC_TABCONTROL));
+                switch(tabIndex)
+                {
+                    case 0:
+                        setTabOne(hwnd);
+                        break;
+                    case 1:
+                        setTabTwo(hwnd);
+                        break;
+                    default:
+                        break;
+                }
+            }
+            break;
+        }
+
         case WM_INITDIALOG:
             initUserData(hwnd);
 
@@ -163,21 +218,19 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
 
             // get and modify text boxes
             HWND hwndEdit;
+            char writeBuf[8];
 
-            char currMinutesBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_MIN_EDIT);
-            sprintf(currMinutesBuf, "%d", user_data->timer_current.minutes);
-            SetWindowText(hwndEdit, currMinutesBuf);
+            sprintf(writeBuf, "%d", user_data->timer_current.minutes);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char currSecondsBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_SEC_EDIT);
-            sprintf(currSecondsBuf, "%d", user_data->timer_current.seconds);
-            SetWindowText(hwndEdit, currSecondsBuf);
+            sprintf(writeBuf, "%d", user_data->timer_current.seconds);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char currDsecondsBuf[2];
             hwndEdit = GetDlgItem(hwnd, ID_DSEC_EDIT);
-            sprintf(currDsecondsBuf, "%d", user_data->timer_current.decaseconds);
-            SetWindowText(hwndEdit, currDsecondsBuf);
+            sprintf(writeBuf, "%d", user_data->timer_current.decaseconds);
+            SetWindowText(hwndEdit, writeBuf);
 
             hwndEdit = GetDlgItem(hwnd, ID_HM_NAME_EDIT);
             SetWindowText(hwndEdit, user_data->homeName);
@@ -185,137 +238,78 @@ static INT_PTR CALLBACK SettingsDlgProc(HWND hwnd, UINT msg, WPARAM wParam, LPAR
             hwndEdit = GetDlgItem(hwnd, ID_AW_NAME_EDIT);
             SetWindowText(hwndEdit, user_data->awayName);
 
-            char homeScoreBuf[8];
             hwndEdit = GetDlgItem(hwnd, ID_HM_SCORE_EDIT);
-            sprintf(homeScoreBuf, "%d", user_data->homeScore);
-            SetWindowText(hwndEdit, homeScoreBuf);
+            sprintf(writeBuf, "%d", user_data->homeScore);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char awayScoreBuf[8];
             hwndEdit = GetDlgItem(hwnd, ID_AW_SCORE_EDIT);
-            sprintf(awayScoreBuf, "%d", user_data->awayScore);
-            SetWindowText(hwndEdit, awayScoreBuf);
+            sprintf(writeBuf, "%d", user_data->awayScore);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char homeTimeoutBuf[2];
             hwndEdit = GetDlgItem(hwnd, ID_HM_TO_EDIT);
-            sprintf(homeTimeoutBuf, "%d", user_data->homeTimeouts);
-            SetWindowText(hwndEdit, homeTimeoutBuf);
+            sprintf(writeBuf, "%d", user_data->homeTimeouts);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char awayTimeoutBuf[2];
             hwndEdit = GetDlgItem(hwnd, ID_AW_TO_EDIT);
-            sprintf(awayTimeoutBuf, "%d", user_data->awayTimeouts);
-            SetWindowText(hwndEdit, awayTimeoutBuf);
+            sprintf(writeBuf, "%d", user_data->awayTimeouts);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char periodBuf[2];
             hwndEdit = GetDlgItem(hwnd, ID_PERIOD_EDIT);
-            sprintf(periodBuf, "%d", user_data->period);
-            SetWindowText(hwndEdit, periodBuf);
+            sprintf(writeBuf, "%d", user_data->period);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char periodNoteBuf[2];
             hwndEdit = GetDlgItem(hwnd, ID_PERIOD_NOTE);
-            sprintf(periodNoteBuf, "Set as %d for OT.", user_data->max_periods+1);
-            SetWindowText(hwndEdit, periodNoteBuf);
+            sprintf(writeBuf, "Set as %d for OT.", user_data->max_periods+1);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char defMinutesBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_DEF_TIMER_MIN_EDIT);
-            sprintf(defMinutesBuf, "%d", user_data->timer_default.minutes);
-            SetWindowText(hwndEdit, defMinutesBuf);
+            sprintf(writeBuf, "%d", user_data->timer_default.minutes);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char defSecondsBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_DEF_TIMER_SEC_EDIT);
-            sprintf(defSecondsBuf, "%d", user_data->timer_default.seconds);
-            SetWindowText(hwndEdit, defSecondsBuf);
+            sprintf(writeBuf, "%d", user_data->timer_default.seconds);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char defDsecondsBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_DEF_TIMER_DSEC_EDIT);
-            sprintf(defDsecondsBuf, "%d", user_data->timer_default.decaseconds);
-            SetWindowText(hwndEdit, defDsecondsBuf);
+            sprintf(writeBuf, "%d", user_data->timer_default.decaseconds);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char defToMinutesBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_DEF_TO_MIN_EDIT);
-            sprintf(defToMinutesBuf, "%d", user_data->timeout_default.minutes);
-            SetWindowText(hwndEdit, defToMinutesBuf);
+            sprintf(writeBuf, "%d", user_data->timeout_default.minutes);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char defToSecondsBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_DEF_TO_SEC_EDIT);
-            sprintf(defToSecondsBuf, "%d", user_data->timeout_default.seconds);
-            SetWindowText(hwndEdit, defToSecondsBuf);
+            sprintf(writeBuf, "%d", user_data->timeout_default.seconds);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char defToDsecondsBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_DEF_TO_DSEC_EDIT);
-            sprintf(defToDsecondsBuf, "%d", user_data->timeout_default.decaseconds);
-            SetWindowText(hwndEdit, defToDsecondsBuf);
+            sprintf(writeBuf, "%d", user_data->timeout_default.decaseconds);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char defOtMinutesBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_DEF_OT_MIN_EDIT);
-            sprintf(defOtMinutesBuf, "%d", user_data->ot_default.minutes);
-            SetWindowText(hwndEdit, defOtMinutesBuf);
+            sprintf(writeBuf, "%d", user_data->ot_default.minutes);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char defOtSecondsBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_DEF_OT_SEC_EDIT);
-            sprintf(defOtSecondsBuf, "%d", user_data->ot_default.seconds);
-            SetWindowText(hwndEdit, defOtSecondsBuf);
+            sprintf(writeBuf, "%d", user_data->ot_default.seconds);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char defOtDsecondsBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_DEF_OT_DSEC_EDIT);
-            sprintf(defOtDsecondsBuf, "%d", user_data->ot_default.decaseconds);
-            SetWindowText(hwndEdit, defOtDsecondsBuf);
+            sprintf(writeBuf, "%d", user_data->ot_default.decaseconds);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char maxPeriodBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_MAX_PER_EDIT);
-            sprintf(maxPeriodBuf, "%d", user_data->max_periods);
-            SetWindowText(hwndEdit, maxPeriodBuf);
+            sprintf(writeBuf, "%d", user_data->max_periods);
+            SetWindowText(hwndEdit, writeBuf);
             
-            char maxOtBuf[3];
             hwndEdit = GetDlgItem(hwnd, ID_MAX_TO_EDIT);
-            sprintf(maxOtBuf, "%d", user_data->max_timeouts);
-            SetWindowText(hwndEdit, maxOtBuf);
+            sprintf(writeBuf, "%d", user_data->max_timeouts);
+            SetWindowText(hwndEdit, writeBuf);
             
             setTabOne(hwnd);
             return TRUE;
 
-        case WM_NOTIFY:
-            {
-                NMHDR* pnmhdr = (NMHDR*)lParam;
-                if (pnmhdr->code == TCN_SELCHANGE) {
-                    // Tab selection changed
-                    int tabIndex = TabCtrl_GetCurSel(GetDlgItem(hwnd, IDC_TABCONTROL));
-                    switch(tabIndex)
-                    {
-                        case 0:
-                            setTabOne(hwnd);
-                            break;
-                        case 1:
-                            setTabTwo(hwnd);
-                            break;
-                        default:
-                            break;
-                    }
-                }
-                break;
-            }
-
-        case WM_COMMAND:
-            if (LOWORD(wParam) == IDOK)
-            {
-                // still need checks if change? for now just auto set
-                readUserData(hwnd);
-                saveUserDataAndPaint(hwnd);
-                free(user_data);
-                EndDialog(hwnd, IDOK);
-
-                return TRUE;
-            }
-            else if (LOWORD(wParam) == IDCANCEL)
-            {
-                // No changes need to be made, simply exit
-                free(user_data);
-                EndDialog(hwnd, IDCANCEL);
-                return TRUE;
-            }
-            break;
-
         case WM_CLOSE:
-            // Handle close button click
             free(user_data);
             EndDialog(hwnd, IDCANCEL);
             return TRUE;
@@ -348,103 +342,145 @@ static void initUserData(HWND hwnd)
     user_data->max_periods = scoreboard_control->defaults.data.max_periods;
 }
 
-static void readUserData(HWND hwnd)
+static void updateUserData(HWND hwnd, int controlId)
 {
     HWND hwndRead;
     char * buf;
     buf = malloc(sizeof(char)*28);
-    
-    hwndRead = GetDlgItem(hwnd, ID_HM_NAME_EDIT);
-    GetWindowText(hwndRead, buf, 28);
-    strcpy(user_data->homeName, buf);
-    
-    hwndRead = GetDlgItem(hwnd, ID_AW_NAME_EDIT);
-    GetWindowText(hwndRead, buf, 28);
-    strcpy(user_data->awayName, buf);
-    
-    hwndRead = GetDlgItem(hwnd, ID_HM_SCORE_EDIT);
-    GetWindowText(hwndRead, buf, 4);
-    user_data->homeScore = atoi(buf);
-    
-    hwndRead = GetDlgItem(hwnd, ID_AW_SCORE_EDIT);
-    GetWindowText(hwndRead, buf, 4);
-    user_data->awayScore = atoi(buf);
-    
-    hwndRead = GetDlgItem(hwnd, ID_HM_TO_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->homeTimeouts = atoi(buf);
-    
-    hwndRead = GetDlgItem(hwnd, ID_AW_TO_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->awayTimeouts = atoi(buf);
 
-    hwndRead = GetDlgItem(hwnd, ID_MIN_EDIT);
-    GetWindowText(hwndRead, buf, 3);
-    user_data->timer_current.minutes = atoi(buf);
- 
-    hwndRead = GetDlgItem(hwnd, ID_SEC_EDIT);
-    GetWindowText(hwndRead, buf, 3);
-    user_data->timer_current.seconds = atoi(buf);
+    switch(controlId)
+    {
+        case ID_HM_NAME_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 28);
+            strcpy(user_data->homeName, buf);
+            break;
 
-    hwndRead = GetDlgItem(hwnd, ID_DSEC_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->timer_current.decaseconds = atoi(buf);
-    
-    hwndRead = GetDlgItem(hwnd, ID_PERIOD_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->period = atoi(buf);
+        case ID_AW_NAME_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 28);
+            strcpy(user_data->awayName, buf);
+            break;
 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_TIMER_MIN_EDIT);
-    GetWindowText(hwndRead, buf, 3);
-    user_data->timer_default.minutes = atoi(buf);
- 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_TIMER_SEC_EDIT);
-    GetWindowText(hwndRead, buf, 3);
-    user_data->timer_default.seconds = atoi(buf);
+        case ID_HM_SCORE_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 4);
+            user_data->homeScore = atoi(buf);
+            break;
 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_TIMER_DSEC_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->timer_default.decaseconds = atoi(buf);
+        case ID_AW_SCORE_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 4);
+            user_data->awayScore = atoi(buf);
+            break;
 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_TO_MIN_EDIT);
-    GetWindowText(hwndRead, buf, 3);
-    user_data->timeout_default.minutes = atoi(buf);
- 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_TO_SEC_EDIT);
-    GetWindowText(hwndRead, buf, 3);
-    user_data->timeout_default.seconds = atoi(buf);
+        case ID_HM_TO_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 2);
+            user_data->homeTimeouts = atoi(buf);
+            break;
 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_TO_DSEC_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->timeout_default.decaseconds = atoi(buf);
+        case ID_AW_TO_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 2);
+            user_data->awayTimeouts = atoi(buf);  
+            break; 
 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_OT_MIN_EDIT);
-    GetWindowText(hwndRead, buf, 3);
-    user_data->ot_default.minutes = atoi(buf);
- 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_OT_SEC_EDIT);
-    GetWindowText(hwndRead, buf, 3);
-    user_data->ot_default.seconds = atoi(buf);
+        case ID_MIN_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 3);
+            user_data->timer_current.minutes = atoi(buf);
+            break;
 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_OT_DSEC_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->ot_default.decaseconds = atoi(buf);
- 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_OT_SEC_EDIT);
-    GetWindowText(hwndRead, buf, 3);
-    user_data->ot_default.seconds = atoi(buf);
+        case ID_SEC_EDIT: 
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 3);
+            user_data->timer_current.seconds = atoi(buf);
+            break;
 
-    hwndRead = GetDlgItem(hwnd, ID_DEF_OT_DSEC_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->ot_default.decaseconds = atoi(buf);
+        case ID_DSEC_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 2);
+            user_data->timer_current.decaseconds = atoi(buf);
+            break;
 
-    hwndRead = GetDlgItem(hwnd, ID_MAX_PER_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->max_periods = atoi(buf);
+        case ID_PERIOD_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 2);
+            user_data->period = atoi(buf);
+            break;
 
-    hwndRead = GetDlgItem(hwnd, ID_MAX_TO_EDIT);
-    GetWindowText(hwndRead, buf, 2);
-    user_data->max_timeouts = atoi(buf);
+        case ID_DEF_TIMER_MIN_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 3);
+            user_data->timer_default.minutes = atoi(buf);
+            break;
+
+        case ID_DEF_TIMER_SEC_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 3);
+            user_data->timer_default.seconds = atoi(buf);
+            break;
+
+        case ID_DEF_TIMER_DSEC_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 2);
+            user_data->timer_default.decaseconds = atoi(buf);
+            break;
+
+        case ID_DEF_TO_MIN_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 3);
+            user_data->timeout_default.minutes = atoi(buf);
+            break;
+
+        case ID_DEF_TO_SEC_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 3);
+            user_data->timeout_default.seconds = atoi(buf);
+            break;
+
+        case ID_DEF_TO_DSEC_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 2);
+            user_data->timeout_default.decaseconds = atoi(buf);
+            break;
+        
+        case ID_DEF_OT_MIN_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 3);
+            user_data->ot_default.minutes = atoi(buf);
+            break;
+
+        case ID_DEF_OT_SEC_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 3);
+            user_data->ot_default.seconds = atoi(buf);
+            break;
+
+        case ID_DEF_OT_DSEC_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 2);
+            user_data->ot_default.decaseconds = atoi(buf);
+            break;
+
+        case ID_MAX_PER_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 2);
+            user_data->max_periods = atoi(buf);
+            break;
+
+        case ID_MAX_TO_EDIT:
+            hwndRead = GetDlgItem(hwnd, controlId);
+            GetWindowText(hwndRead, buf, 2);
+            user_data->max_timeouts = atoi(buf);
+            break;
+
+        default:
+            free(buf);
+            return;
+    }
+    free(buf);
 }
 
 static void saveUserDataAndPaint(HWND hwnd)

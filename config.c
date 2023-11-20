@@ -208,7 +208,6 @@ static void loadConfig(ScoreboardDefaults* defaults)
     fclose(file);
 }
 
-
 void writeToConfig(ScoreboardControl* scoreboard_control)
 {
     FILE* file = fopen( "default.conf", "w");
@@ -218,5 +217,4 @@ void writeToConfig(ScoreboardControl* scoreboard_control)
     }
     
     fclose(file);
-    
 }

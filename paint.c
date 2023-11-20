@@ -46,7 +46,6 @@ static void roundRectCreate(HDC hdc, RECT * rect, float lratio, float rratio, fl
 }
 
 /* REGION PAINTING FUNCTIONS */
-
 void paintTimer(ScoreboardDesign* scoreboard_design, HDC hdc, HWND hwnd, int minutes, int seconds, int decaseconds)
 {
     // Select the brush and pen into the device context
@@ -399,7 +398,6 @@ void paintRightLogo(ScoreboardDesign* scoreboard_design, HDC hdc, HWND hwnd)
 	bgRect.bottom = floor(0.3* (clientRect.bottom - clientRect.top));
 	bgRect.top = clientRect.top;
 
-	//background
 	FillRect(hdc, &bgRect, scoreboard_design->backgroundBrush);
 
 	if (scoreboard_design->logoRight != NULL)
@@ -422,19 +420,6 @@ void paintRightLogo(ScoreboardDesign* scoreboard_design, HDC hdc, HWND hwnd)
         SelectObject(hdcMem, oldBitmap);
         DeleteDC(hdcMem);
 	}
-
-	/*
-	textRect.left = bgRect.left;
-	textRect.right = floor(0.975 * (clientRect.right - clientRect.left));
-	textRect.bottom = bgRect.bottom;
-	textRect.top = floor(0.07* (clientRect.bottom - clientRect.top));
-
-	SelectObject(hdc, scoreboard_design->smallFont);
-	const char * logo = "JESUWON\nBASKETBALL\nASSOCIATION";
-	SetTextColor(hdc, RGB(255, 255, 255));
-	SetBkMode(hdc, TRANSPARENT);
-	DrawText(hdc, logo, -1, &textRect, DT_RIGHT | DT_TOP);
-	*/
 }
 
 void paintLogoBackground(ScoreboardDesign* scoreboard_design, HDC hdc, HWND hwnd)
@@ -443,10 +428,8 @@ void paintLogoBackground(ScoreboardDesign* scoreboard_design, HDC hdc, HWND hwnd
 	GetClientRect(hwnd, &clientRect);
 	SelectObject(hdc, scoreboard_design->backgroundBrush);
 
-	//background
 	FillRect(hdc, &clientRect, scoreboard_design->backgroundBrush);
 
-	// logo
 	if (scoreboard_design->logo != NULL)
 	{
 		BITMAP bmp;

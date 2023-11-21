@@ -1,6 +1,7 @@
 ﻿#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "config.h"
 
@@ -47,27 +48,27 @@ void loadConfigFileAndDefaults( ScoreboardControl* scoreboard_control, Scoreboar
 
     setDefaults(scoreboard_control);
 
-	scoreboard_design->timerFont = CreateFont(0.3 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
+	scoreboard_design->timerFont = CreateFont(floor(0.3 * GetSystemMetrics(SM_CYSCREEN)), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
         DEFAULT_PITCH | FF_SWISS, "Arial Nova");
 
-	scoreboard_design->teamFont = CreateFont(0.11 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
+	scoreboard_design->teamFont = CreateFont(floor(0.11 * GetSystemMetrics(SM_CYSCREEN)), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
         DEFAULT_PITCH | FF_SWISS, "Arial Nova");
 
-	scoreboard_design->scoreFont = CreateFont(0.43 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
+	scoreboard_design->scoreFont = CreateFont(floor(0.43 * GetSystemMetrics(SM_CYSCREEN)), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
         DEFAULT_PITCH | FF_SWISS, "Arial Nova");
 
-	scoreboard_design->periodFont = CreateFont(0.19 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
+	scoreboard_design->periodFont = CreateFont(floor(0.19 * GetSystemMetrics(SM_CYSCREEN)), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
         DEFAULT_PITCH | FF_SWISS, "Arial Nova");
 
-	scoreboard_design->overtimeFont = CreateFont(0.14 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
+	scoreboard_design->overtimeFont = CreateFont(floor(0.14 * GetSystemMetrics(SM_CYSCREEN)), 0, 0, 0, FW_BOLD, FALSE, FALSE, FALSE,                      
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
         DEFAULT_PITCH | FF_SWISS, "Arial Nova");
 
-	scoreboard_design->smallFont = CreateFont(0.035 * GetSystemMetrics(SM_CYSCREEN), 0, 0, 0, FW_BOLD, TRUE, FALSE, FALSE,                      
+	scoreboard_design->smallFont = CreateFont(floor(0.035 * GetSystemMetrics(SM_CYSCREEN)), 0, 0, 0, FW_BOLD, TRUE, FALSE, FALSE,                      
         DEFAULT_CHARSET, OUT_DEFAULT_PRECIS, CLIP_DEFAULT_PRECIS, DEFAULT_QUALITY,           
         DEFAULT_PITCH | FF_SWISS, "Arial Nova");
 
@@ -215,6 +216,72 @@ void writeToConfig(ScoreboardControl* scoreboard_control)
         perror("Error opening file");
         exit(EXIT_FAILURE);
     }
-    
+
+    char line[79];
+
+    sprintf(line, "leftMinusPtKey=%d\n", scoreboard_control->defaults.keycodes.leftMinusPtKey);
+    fputs(line, file);
+    sprintf(line, "leftPlus2PtKey=%d\n", scoreboard_control->defaults.keycodes.leftPlus2PtKey);
+    fputs(line, file);
+    sprintf(line, "leftPlus3PtKey=%d\n", scoreboard_control->defaults.keycodes.leftPlus3PtKey);
+    fputs(line, file);
+    sprintf(line, "leftTimeoutKey=%d\n", scoreboard_control->defaults.keycodes.leftTimeoutKey);
+    fputs(line, file);
+    sprintf(line, "rightMinusPtKey=%d\n", scoreboard_control->defaults.keycodes.rightMinusPtKey);
+    fputs(line, file);
+    sprintf(line, "rightPlus2PtKey=%d\n", scoreboard_control->defaults.keycodes.rightPlus2PtKey);
+    fputs(line, file);
+    sprintf(line, "rightPlus3PtKey=%d\n", scoreboard_control->defaults.keycodes.rightPlus3PtKey);
+    fputs(line, file);
+    sprintf(line, "rightTimeoutKey=%d\n", scoreboard_control->defaults.keycodes.rightTimeoutKey);
+    fputs(line, file);
+    sprintf(line, "switchKey=%d\n", scoreboard_control->defaults.keycodes.switchKey);
+    fputs(line, file);
+    sprintf(line, "resetKey=%d\n", scoreboard_control->defaults.keycodes.resetKey);
+    fputs(line, file);
+    sprintf(line, "setKey=%d\n", scoreboard_control->defaults.keycodes.setKey);
+    fputs(line, file);
+    sprintf(line, "periodPlusKey=%d\n", scoreboard_control->defaults.keycodes.periodPlusKey);
+    fputs(line, file);
+    sprintf(line, "periodMinusKey=%d\n", scoreboard_control->defaults.keycodes.periodMinusKey);
+    fputs(line, file);
+    sprintf(line, "startTimeKey=%d\n", scoreboard_control->defaults.keycodes.startTimeKey);
+    fputs(line, file);
+    sprintf(line, "stopTimeKey=%d\n", scoreboard_control->defaults.keycodes.stopTimeKey);
+    fputs(line, file);
+    sprintf(line, "timeoutClearKey=%d\n", scoreboard_control->defaults.keycodes.timeoutClearKey);
+    fputs(line, file);
+    sprintf(line, "configureKey=%d\n", scoreboard_control->defaults.keycodes.configureKey);
+    fputs(line, file);
+
+    sprintf(line, "timer_length_min=%d\n", scoreboard_control->defaults.data.timer_default.minutes);
+    fputs(line, file);
+    sprintf(line, "timer_length_sec=%d\n", scoreboard_control->defaults.data.timer_default.seconds);
+    fputs(line, file);
+    sprintf(line, "timer_length_dsec=%d\n", scoreboard_control->defaults.data.timer_default.decaseconds);
+    fputs(line, file);
+    sprintf(line, "timeout_length_min=%d\n", scoreboard_control->defaults.data.timeout_default.minutes);
+    fputs(line, file);
+    sprintf(line, "timeout_length_sec=%d\n", scoreboard_control->defaults.data.timeout_default.seconds);
+    fputs(line, file);
+    sprintf(line, "timeout_length_dsec=%d\n", scoreboard_control->defaults.data.timeout_default.decaseconds);
+    fputs(line, file);
+    sprintf(line, "overtime_length_min=%d\n", scoreboard_control->defaults.data.ot_default.minutes);
+    fputs(line, file);
+    sprintf(line, "overtime_length_sec=%d\n", scoreboard_control->defaults.data.ot_default.seconds);
+    fputs(line, file);
+    sprintf(line, "overtime_length_dsec=%d\n", scoreboard_control->defaults.data.ot_default.decaseconds);
+    fputs(line, file);
+
+    sprintf(line,"home_name=%s\n", scoreboard_control->defaults.data.defaultHomeName);
+    fputs(line, file);
+    sprintf(line,"away_name=%s\n", scoreboard_control->defaults.data.defaultAwayName);
+    fputs(line, file);
+    sprintf(line, "max_timeouts=%d\n", scoreboard_control->defaults.data.max_timeouts);
+    fputs(line, file);
+    sprintf(line, "max_periods=%d\n", scoreboard_control->defaults.data.max_periods);
+    fputs(line, file);
+
+
     fclose(file);
 }

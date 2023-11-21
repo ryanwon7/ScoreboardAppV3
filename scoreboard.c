@@ -14,7 +14,8 @@
 /* Global States */
 bool g_clock_running;
 bool g_timeout_running;
-HANDLE g_hTimer, g_hTimeout;
+HANDLE g_hTimer = NULL;
+HANDLE g_hTimeout = NULL;
 
 /* Static function declaration */
 static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lParam);
@@ -78,7 +79,7 @@ int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance, PWSTR pCmdLine
         DispatchMessage(&msg);
     }
 
-	//writeToConfig(scoreboard_control);
+	writeToConfig(scoreboard_control);
 
 	free(scoreboard_control);
 	deleteDesigns(scoreboard_design);
@@ -105,11 +106,11 @@ static LRESULT CALLBACK WndProc(HWND hwnd, UINT msg, WPARAM wParam, LPARAM lPara
         case WM_DESTROY:
 			if (g_clock_running)
 			{
-				KillTimer(hwnd, 1);
+				DeleteTimerQueueTimer(NULL, g_hTimer, NULL);
 			}
 			else if (g_timeout_running)
 			{
-				KillTimer(hwnd, 2);
+				DeleteTimerQueueTimer(NULL, g_hTimeout, NULL);
 			}
             PostQuitMessage(0);
             break;
